@@ -1,25 +1,118 @@
 ---
 title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+author: "Juan Villarreal"
+date: "March 25, 2017"
+output: html_document 
+html_document: PA1_template.html
+keep_md: true
 ---
+## Setup
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, results = "asis")
+```
+
+## 1 Loading and preprocessing the data
+```{r LoadData1}
+dataOriginal <- read.csv(unzip("activity.zip", "activity.csv"), header = TRUE, sep=",")
+## ignoring NA Steps values in a new dataset
+dataNoNA <- na.omit(dataOriginal)
+```
+
+## 2 Histogram of the total number of steps taken each day
+```{r barPlo2}
+## TSDAy = Total Steps by Day
+TSDay <- aggregate(steps ~ date, dataNoNA, sum)
+par(mar=c(10,5,1,1))
+#png('F://R WorkingDirectory//Reproducible_research1//Figures//Figure1.png')
+barplot(height = TSDay$steps, width = c(5),names.arg = TSDay$date, xlab = "", ylab = "# of Steps", main = "Total steps by day", col = "blue", las=2)
+#dev.off()
+```
+
+## 3 Mean and median number of steps taken each day
+```{r Table3}
+library(xtable)
+MeanTSDay <- aggregate(steps ~ date, TSDay, mean)
+MedianTSDay <- aggregate(steps ~ date, TSDay, median)
+MediaMeanTSDay <- xtable(merge(x=MeanTSDay,y=MedianTSDay, by = "date", all = TRUE))
+names(MediaMeanTSDay) <- c("Date", "Mean","Median")
+print(MediaMeanTSDay, type= "html")
+```
+
+## 4 Time series plot of the average number of steps taken?
+```{r Timeline4}
+#3ASInterval = Average Steps by Interval
+ASInterval <- aggregate(steps ~ interval, dataNoNA, mean)
+#png('F://R WorkingDirectory//Reproducible_research1//Figures//Figure2.png')
+plot(ASInterval$interval, ASInterval$steps, type = "l", xlab = "Interval Number", ylab = "Average Steps", main = "Average Steps by Interval", sub = "between 2012-10-02 and 2012-11-29")
+#dev.off()
+```
+
+## 5 The 5-minute interval that, on average, contains the maximum number of steps?
+```{r MaximumInterval5}
+FiveminMax <- xtable(ASInterval[ASInterval$steps==max(ASInterval$steps),])
+print(FiveminMax, type= "html")
+```
+
+## 6 Imputing missing values, Merging the mean for each interval to fill the steps NA values with realistics values
+```{r Imputing6}
+ library(plyr)
+## Selecting only NA rows for steps column
+dataNA <- dataOriginal[is.na(dataOriginal$steps),] 
+## Merging the mean for each interval to fill the steps NA values with something realistic
+dataMerged <- subset(merge(x=dataNA, y=ASInterval, by = "interval", all.x = TRUE), select = c(4,3,1))
+## Giving right names to the merged data set to union with the dataset that have all values except by rows with Null steps values
+colnames(dataMerged) <- c("steps","date","interval")
+dataImputed <- rbind.fill(dataMerged, dataNoNA)
+```
+
+## 7 Histogram of the total number of steps taken each day after missing values are imputed 
+```{r Imputing7}
+TSDayImputed <- aggregate(steps ~ date, dataImputed, sum)
+par(mar=c(10,5,1,1))
+#png('F://R WorkingDirectory//Reproducible_research1//Figures//Figure3.png')
+barplot(height = TSDayImputed$steps, width = c(5),names.arg = TSDayImputed$date, xlab = "", ylab = "# of Steps", main = "Total steps by day With imputed data", col = "blue", las=2)
+#dev.off()
+```
+
+```{r Imputing8}
+## Performing same calculations on step 3 but with the imputed dataset 
+MeanTSDayImputed <- aggregate(steps ~ date, TSDayImputed, mean)
+MedianTSDayImputed <- aggregate(steps ~ date, TSDayImputed, median)
+MediaMeanTSDayImputed <- xtable(merge(x=MeanTSDayImputed,y=MedianTSDayImputed, by = "date", all = TRUE))
+names(MediaMeanTSDayImputed) <- c("Date", "Mean","Median")
+print(MediaMeanTSDayImputed, type= "html")
+
+## Performing same calculations on step 4 but with the imputed dataset 
+ASIntervalImputed <- aggregate(steps ~ interval, dataImputed, mean)
+#png('F://R WorkingDirectory//Reproducible_research1//Figures//Figure4.png')
+plot(ASIntervalImputed$interval, ASIntervalImputed$steps, type = "l", xlab = "Interval Number", ylab = "Average Steps", main = "Average Steps by Interval", sub = "between 2012-10-01 and 2012-11-29 Including Imputed data")
+#dev.off()
+
+## Performing same calculations on step 5 but with the imputed dataset 
+FiveminMaxImputed <- xtable(ASIntervalImputed[ASIntervalImputed$steps==max(ASIntervalImputed$steps),])
+print(FiveminMaxImputed, type= "html")
+```
+
+## There isn't a big difference if we ignore missing NA values in terms of our specific analysis, The avarege by day for the missing values can be found in the histogram chart, in the list, the maximum vaule with steps still the same than ignoring the NA values.
 
 
-## Loading and preprocessing the data
-
-
-
-## What is mean total number of steps taken per day?
-
-
-
-## What is the average daily activity pattern?
-
-
-
-## Imputing missing values
-
-
+## 8 Panel plot comparing the average number of steps taken per 5-minute interval across weekdays and weekends
 
 ## Are there differences in activity patterns between weekdays and weekends?
+```{r Daytypeanalysis8}
+## Adding the column to flag the rows as Weekdays by default all are weekedays
+dataImputed <- cbind(Daytype = 'Weekday', dataImputed)
+## Converting date text column into a Date column
+dataImputed$date <- as.Date(dataImputed$date)
+## Updating the rows in the column Daytype in case they are weekends only
+dataImputed$Daytype  <- ifelse(weekdays(dataImputed$date) %in% c("Saturday", "Sunday"), "Weekend", "weekday")
+## Generating the mean for the steps by interval and DayType
+ASImputedDaytype <- aggregate(steps ~ interval + Daytype, dataImputed, mean)
+library(ggplot2)
+par(mar=c(1,1,1,1))
+#png('F://R WorkingDirectory//Reproducible_research1//Figures//Figure5.png')
+qplot(x=interval, y=steps, data = ASImputedDaytype, facets = . ~ Daytype, main = "Benchmark between Weekend and Weekdays average steps done by interval")
+#dev.off()
+```
+
+## There is a clear difference in avarage steps done during weekend days and weekday days for same intervals
